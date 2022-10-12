@@ -127,7 +127,7 @@ class DynamicResolver(client.Resolver):
                 return client.Resolver.lookupAddress(self, result, timeout)
 
             payload = dns.Record_A(address=result.encode())
-            answer = dns.RRHeader(name=name, payload=payload)
+            answer = dns.RRHeader(name=name, payload=payload, ttl=60)
 
             answers = [answer]
             authority = []
