@@ -1,1 +1,1 @@
-Twisted
+Twisted>=22.8.0

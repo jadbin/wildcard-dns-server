@@ -1,13 +1,13 @@
-from __future__ import print_function
-
-import os
-import sys
-import re
 import json
+import os
+import random
+import re
 import string
+import sys
 
 from twisted.internet import reactor, defer
-from twisted.names import client, dns, error, server
+from twisted.names import client, dns, server
+
 
 class DynamicResolver(client.Resolver):
     """
@@ -17,9 +17,8 @@ class DynamicResolver(client.Resolver):
 
     """
 
-
     def __init__(self, servers, wildcard_domain, mapped_hosts=None,
-            debug_level=0):
+                 debug_level=0):
 
         client.Resolver.__init__(self, servers=servers)
 
@@ -32,7 +31,7 @@ class DynamicResolver(client.Resolver):
         # wilcard domain.
 
         pattern = (r'.*\.(?P<ipaddr>\d+\.\d+\.\d+\.\d+)\.%s' %
-                re.escape(wildcard_domain))
+                   re.escape(wildcard_domain))
 
         if self._debug_level > 0:
             print('wildcard %s' % pattern, file=sys.stderr)
@@ -51,9 +50,9 @@ class DynamicResolver(client.Resolver):
         if mapped_hosts:
             for inbound, outbound in mapped_hosts.items():
                 label = 'RULE%s' % count
-                inbound = re.escape(inbound).replace('\\*', '.*') 
+                inbound = re.escape(inbound).replace('\\*', '.*')
                 patterns.append('(?P<%s>%s)' % (label, inbound))
-                results[label] = outbound
+                results[label] = outbound.split(',')
                 count += 1
 
             pattern = '|'.join(patterns)
@@ -91,7 +90,7 @@ class DynamicResolver(client.Resolver):
         if match:
             label = [k for k, v in match.groupdict().items() if v].pop()
 
-            result = self._mapping_results[label]
+            result = random.choice(self._mapping_results[label])
 
             if self._debug_level > 1:
                 print('mapping %s --> %s' % (name, result), file=sys.stderr)
@@ -99,6 +98,8 @@ class DynamicResolver(client.Resolver):
             return result
 
     def lookupAddress(self, name, timeout=None):
+        name = name.decode()
+
         if self._debug_level > 2:
             print('address %s' % name, file=sys.stderr)
 
@@ -125,7 +126,7 @@ class DynamicResolver(client.Resolver):
 
                 return client.Resolver.lookupAddress(self, result, timeout)
 
-            payload=dns.Record_A(address=bytes(result))
+            payload = dns.Record_A(address=result.encode())
             answer = dns.RRHeader(name=name, payload=payload)
 
             answers = [answer]
@@ -139,6 +140,7 @@ class DynamicResolver(client.Resolver):
                 print('fallback %s' % name, file=sys.stderr)
 
             return client.Resolver.lookupAddress(self, name, timeout)
+
 
 def main():
     name_servers = os.environ.get('NAME_SERVERS', '8.8.8.8,8.8.4.4')
@@ -166,9 +168,9 @@ def main():
 
     factory = server.DNSServerFactory(
         clients=[DynamicResolver(servers=server_list,
-            wildcard_domain=wildcard_domain,
-            mapped_hosts=mapped_hosts,
-            debug_level=debug_level)]
+                                 wildcard_domain=wildcard_domain,
+                                 mapped_hosts=mapped_hosts,
+                                 debug_level=debug_level)]
     )
 
     protocol = dns.DNSDatagramProtocol(controller=factory)
@@ -177,6 +179,7 @@ def main():
     reactor.listenTCP(10053, factory)
 
     reactor.run()
+
 
 if __name__ == '__main__':
     raise SystemExit(main())

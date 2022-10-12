@@ -1,7 +1,5 @@
-FROM python:2.7-onbuild
-
-USER www-data
+FROM python:3.7
 
 EXPOSE 10053
 
-CMD [ "python", "server.py" ]
+ENTRYPOINT ["python", "server.py"]
